@@ -3,7 +3,9 @@ package main
 import (
 	"errors"
 	"fmt"
+	"math"
 	"os"
+	"strings"
 )
 
 func main() {
@@ -16,7 +18,6 @@ func main() {
 
 	codes, err := getCodes(fileName)
 
-	fmt.Println(codes)
 	if err != nil {
 		fmt.Println("File splitting error:", err)
 	}
@@ -27,8 +28,57 @@ func main() {
 
 }
 
+func initialiseMap(codeToSymbol map[uint32]string) {
+	for i := 0; i < 256; i++ {
+		codeToSymbol[uint32(i)] = string(i)
+	}
+
+}
+
 func decodeLZW(codes []uint32) string {
-	return ""
+	codeToSymbol := make(map[uint32]string)
+	initialiseMap(codeToSymbol)
+
+	decodedSymbols := make([]string, len(codes))
+
+	// first code must be a number between 0 and 255
+	decodedSymbols[0] = string(codes[0])
+
+	for i, code := range codes {
+		if i == 0 {
+			continue
+		}
+
+		// new symbol to be added to the map
+		var newMapSymbol string
+
+		prevSymbol := decodedSymbols[i-1]
+
+		// if the current symbol is in the map
+		if currSymbol, ok := codeToSymbol[code]; ok {
+			decodedSymbols[i] = currSymbol
+
+			newMapSymbol = prevSymbol + currSymbol[0:1]
+
+		} else {
+			newMapSymbol = prevSymbol + prevSymbol[0:1]
+			decodedSymbols[i] = newMapSymbol
+		}
+
+		// Add the new map symbol to the map
+		if newMapSymbol != "" {
+
+			// all possible codes have been used, so reset map
+			if len(codeToSymbol) >= int(math.Pow(2, 12))-256 {
+				codeToSymbol := make(map[uint32]string)
+				initialiseMap(codeToSymbol)
+			}
+			symbolsCount := uint32(len(codeToSymbol))
+			codeToSymbol[symbolsCount] = newMapSymbol
+		}
+
+	}
+	return strings.Join(decodedSymbols, "")
 }
 
 func parseArgs() (string, error) {
