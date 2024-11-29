@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"math"
 	"os"
 	"strings"
 )
@@ -22,7 +21,11 @@ func main() {
 		fmt.Println("File splitting error:", err)
 	}
 
-	decodedString := decodeLZW(codes)
+	decodedString, err := decodeLZW(codes)
+
+	if err != nil {
+		fmt.Println("Error decoding file:", err)
+	}
 
 	fmt.Println(decodedString)
 
@@ -30,55 +33,55 @@ func main() {
 
 func initialiseMap(codeToSymbol map[uint32]string) {
 	for i := 0; i < 256; i++ {
-		codeToSymbol[uint32(i)] = string(i)
+		codeToSymbol[uint32(i)] = string(byte(i))
 	}
-
 }
 
-func decodeLZW(codes []uint32) string {
+func decodeLZW(codes []uint32) (string, error) {
+
 	codeToSymbol := make(map[uint32]string)
 	initialiseMap(codeToSymbol)
-
 	decodedSymbols := make([]string, len(codes))
 
-	// first code must be a number between 0 and 255
-	decodedSymbols[0] = string(codes[0])
+	var prevSymbol string
+
+	if len(codes) == 0 {
+		return "", nil
+	}
 
 	for i, code := range codes {
-		if i == 0 {
-			continue
-		}
 
-		// new symbol to be added to the map
-		var newMapSymbol string
+		var currSymbol string
 
-		prevSymbol := decodedSymbols[i-1]
-
-		// if the current symbol is in the map
-		if currSymbol, ok := codeToSymbol[code]; ok {
-			decodedSymbols[i] = currSymbol
-
-			newMapSymbol = prevSymbol + currSymbol[0:1]
-
+		// if the current code is in the map
+		if symbol, ok := codeToSymbol[code]; ok {
+			currSymbol = symbol
+			// if the current code is the next to be added to the map
+		} else if code == uint32(len(codeToSymbol)) && prevSymbol != "" {
+			currSymbol = prevSymbol + prevSymbol[0:1]
 		} else {
-			newMapSymbol = prevSymbol + prevSymbol[0:1]
-			decodedSymbols[i] = newMapSymbol
+			return "", errors.New("Invalid code")
 		}
+		decodedSymbols[i] = currSymbol
 
-		// Add the new map symbol to the map
-		if newMapSymbol != "" {
+		if prevSymbol != "" {
 
-			// all possible codes have been used, so reset map
-			if len(codeToSymbol) >= int(math.Pow(2, 12))-256 {
-				codeToSymbol := make(map[uint32]string)
+			// If there are no codes or the limit, we need to reset and add the first new character
+			newEntry := prevSymbol + currSymbol[0:1]
+			codeToSymbol[uint32(len(codeToSymbol))] = newEntry
+
+			if len(codeToSymbol) == 4096 {
+				fmt.Println(len(codeToSymbol))
+				codeToSymbol = make(map[uint32]string)
 				initialiseMap(codeToSymbol)
 			}
-			symbolsCount := uint32(len(codeToSymbol))
-			codeToSymbol[symbolsCount] = newMapSymbol
+
 		}
 
+		prevSymbol = currSymbol
+
 	}
-	return strings.Join(decodedSymbols, "")
+	return strings.Join(decodedSymbols, ""), nil
 }
 
 func parseArgs() (string, error) {
