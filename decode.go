@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -27,8 +28,30 @@ func main() {
 		fmt.Println("Error decoding file:", err)
 	}
 
-	fmt.Println(decodedString)
+	err = writeToFile(fileName, decodedString)
+	if err != nil {
+		fmt.Println("Failed to write to file:", err)
+	}
+}
 
+func writeToFile(fileName string, decodedString string) error {
+
+	base := filepath.Base(fileName)
+	nameWithoutExt := strings.TrimSuffix(base, ".z")
+	decodedFile := "decoded-" + nameWithoutExt
+
+	file, err := os.Create(decodedFile)
+
+	if err != nil {
+		return errors.New("Could not make new file")
+	}
+	defer file.Close()
+
+	_, err = file.WriteString(decodedString)
+	if err != nil {
+		return errors.New("Could not write to new file")
+	}
+	return nil
 }
 
 func initialiseMap(codeToSymbol map[uint32]string) {
