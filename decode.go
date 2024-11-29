@@ -14,12 +14,21 @@ func main() {
 		return
 	}
 
-	codes, err := splitInput(fileName)
+	codes, err := getCodes(fileName)
+
 	fmt.Println(codes)
 	if err != nil {
 		fmt.Println("File splitting error:", err)
 	}
 
+	decodedString := decodeLZW(codes)
+
+	fmt.Println(decodedString)
+
+}
+
+func decodeLZW(codes []uint32) string {
+	return ""
 }
 
 func parseArgs() (string, error) {
@@ -34,7 +43,7 @@ func parseArgs() (string, error) {
 
 }
 
-func splitInput(fileName string) ([]uint32, error) {
+func getCodes(fileName string) ([]uint32, error) {
 	file, err := os.Open(fileName)
 	if err != nil {
 		return nil, errors.New("could not open the file")
@@ -79,7 +88,7 @@ func splitInput(fileName string) ([]uint32, error) {
 	}
 
 	// Number of bits not divisble by 12
-	if collectedBitsSize != 0 {
+	if collectedBitsSize%2 != 0 {
 		return nil, errors.New("not a multiple of 12 bits")
 	}
 
