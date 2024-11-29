@@ -73,6 +73,11 @@ func splitInput(fileName string) ([]uint32, error) {
 
 	}
 
+	// Bitshift the last code right by 4 if the number of codes is odd
+	if len(codes)%2 != 0 {
+		codes[len(codes)-1] = codes[len(codes)-1] >> 4
+	}
+
 	// Number of bits not divisble by 12
 	if collectedBitsSize != 0 {
 		return nil, errors.New("not a multiple of 12 bits")
