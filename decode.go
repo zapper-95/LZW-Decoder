@@ -56,8 +56,9 @@ func writeToFile(fileName string, decodedString string) error {
 
 func initialiseMap(codeToSymbol map[uint32]string) {
 	for i := 0; i < 256; i++ {
-		codeToSymbol[uint32(i)] = string(byte(i))
+		codeToSymbol[uint32(i)] = string(i)
 	}
+
 }
 
 func decodeLZW(codes []uint32) (string, error) {
@@ -81,7 +82,9 @@ func decodeLZW(codes []uint32) (string, error) {
 			currSymbol = symbol
 			// if the current code is the next to be added to the map
 		} else if code == uint32(len(codeToSymbol)) && prevSymbol != "" {
-			currSymbol = prevSymbol + prevSymbol[0:1]
+			// utf-8 stores codes > 127 with multiple bits. Convert to rune to make sure I get the right char
+			prevSymbolRunes := []rune(prevSymbol)
+			currSymbol = prevSymbol + string(prevSymbolRunes[0])
 		} else {
 			return "", errors.New("Invalid code")
 		}
@@ -90,7 +93,8 @@ func decodeLZW(codes []uint32) (string, error) {
 		if prevSymbol != "" {
 
 			// If there are no codes or the limit, we need to reset and add the first new character
-			newEntry := prevSymbol + currSymbol[0:1]
+			currSymbolRunes := []rune(currSymbol)
+			newEntry := prevSymbol + string(currSymbolRunes[0])
 			codeToSymbol[uint32(len(codeToSymbol))] = newEntry
 
 			if len(codeToSymbol) == 4096 {
