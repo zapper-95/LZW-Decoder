@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,13 +18,12 @@ func main() {
 	}
 
 	codes, err := getCodes(fileName)
-	fmt.Println(codes)
 	if err != nil {
 		fmt.Println("File splitting error:", err)
 	}
 
 	decodedString, err := decodeLZW(codes)
-	//print(decodedString)
+	print(decodedString)
 	if err != nil {
 		fmt.Println("Error decoding file:", err)
 	}
@@ -56,7 +56,7 @@ func writeToFile(fileName string, decodedString string) error {
 
 func initialiseMap(codeToSymbol map[uint32]string) {
 	for i := 0; i < 256; i++ {
-		codeToSymbol[uint32(i)] = string(i)
+		codeToSymbol[uint32(i)] = string(rune(i))
 	}
 
 }
@@ -66,8 +66,6 @@ func decodeLZW(codes []uint32) (string, error) {
 	codeToSymbol := make(map[uint32]string)
 	initialiseMap(codeToSymbol)
 	decodedSymbols := make([]string, 0)
-
-	//var prevSymbol []rune
 
 	if len(codes) == 0 {
 		return "", nil
@@ -92,12 +90,8 @@ func decodeLZW(codes []uint32) (string, error) {
 			// if the current code is the next to be added to the map
 		} else if code == uint32(len(codeToSymbol)) {
 			// utf-8 stores codes > 127 with multiple bits. Convert to rune to make sure I get the right char
-			//prevSymbolRunes := []rune(prevSymbol)
 
 			currSymbol = prevSymbol + string(([]rune(prevSymbol))[0])
-
-			//currSymbol = append([]rune{}, prevSymbol...)
-			//currSymbol = append(prevSymbol, prevSymbol[0])
 		} else {
 			return "", errors.New("Invalid code")
 		}
@@ -147,44 +141,31 @@ func getCodes(fileName string) ([]uint32, error) {
 	// A code is up to 12 bits long
 	var codes []uint32
 
-	buffer := make([]byte, 1)
-
-	// The current bits collected is up to 11+8=19
-	collectedBits := uint32(0)
-	collectedBitsSize := 0
+	buffer := make([]byte, 3)
 
 	for {
 		// Reads in the current byte into the buffer
 		n, err := file.Read(buffer)
 
-		if n == 0 || err != nil {
+		if n == 0 && err == io.EOF {
 			break
+		} else if err != nil {
+			return nil, err
 		}
 
-		// shift the bits left and apply a logical or with the next 8 bits
-		collectedBits = (collectedBits << 8) | uint32(buffer[0])
-		collectedBitsSize += 8
+		if n >= 2 {
+			// bytes are int8, so need to cast to allow bitshifting
+			firstCode := (uint32(buffer[0]) << 4) | (uint32(buffer[1]) >> 4)
+			codes = append(codes, firstCode)
+		} else {
+			return nil, errors.New("Invalid number of bytes")
+		}
 
-		if collectedBitsSize >= 12 {
-			// add the first 12 bits as a new code
-			codes = append(codes, collectedBits>>(collectedBitsSize-12))
-
-			// set the collected bits to be only the remaining unused bits
-			collectedBits = collectedBits & ((1 << (collectedBitsSize - 12)) - 1)
-			collectedBitsSize -= 12
+		if n == 3 {
+			secondCode := ((uint32(buffer[1]) & 0x0F) << 8) | uint32(buffer[2])
+			codes = append(codes, secondCode)
 		}
 
 	}
-
-	// Bitshift the last code right by 4 if the number of codes is odd
-	if len(codes)%2 != 0 {
-		codes[len(codes)-1] = codes[len(codes)-1] >> 4
-	}
-
-	// Number of bits not divisble by 12
-	if collectedBitsSize%2 != 0 {
-		return nil, errors.New("not a multiple of 12 bits")
-	}
-
 	return codes, nil
 }
