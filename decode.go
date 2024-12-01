@@ -17,13 +17,13 @@ func main() {
 	}
 
 	codes, err := getCodes(fileName)
-
+	fmt.Println(codes)
 	if err != nil {
 		fmt.Println("File splitting error:", err)
 	}
 
 	decodedString, err := decodeLZW(codes)
-
+	//print(decodedString)
 	if err != nil {
 		fmt.Println("Error decoding file:", err)
 	}
@@ -65,15 +65,24 @@ func decodeLZW(codes []uint32) (string, error) {
 
 	codeToSymbol := make(map[uint32]string)
 	initialiseMap(codeToSymbol)
-	decodedSymbols := make([]string, len(codes))
+	decodedSymbols := make([]string, 0)
 
-	var prevSymbol string
+	//var prevSymbol []rune
 
 	if len(codes) == 0 {
 		return "", nil
 	}
 
-	for i, code := range codes {
+	firstCode := codes[0]
+
+	prevSymbol, ok := codeToSymbol[firstCode]
+
+	if !ok {
+		return "", errors.New("First symbol not in map")
+	}
+	decodedSymbols = append(decodedSymbols, prevSymbol)
+
+	for _, code := range codes[1:] {
 
 		var currSymbol string
 
@@ -81,33 +90,38 @@ func decodeLZW(codes []uint32) (string, error) {
 		if symbol, ok := codeToSymbol[code]; ok {
 			currSymbol = symbol
 			// if the current code is the next to be added to the map
-		} else if code == uint32(len(codeToSymbol)) && prevSymbol != "" {
+		} else if code == uint32(len(codeToSymbol)) {
 			// utf-8 stores codes > 127 with multiple bits. Convert to rune to make sure I get the right char
-			prevSymbolRunes := []rune(prevSymbol)
-			currSymbol = prevSymbol + string(prevSymbolRunes[0])
+			//prevSymbolRunes := []rune(prevSymbol)
+
+			currSymbol = prevSymbol + string(([]rune(prevSymbol))[0])
+
+			//currSymbol = append([]rune{}, prevSymbol...)
+			//currSymbol = append(prevSymbol, prevSymbol[0])
 		} else {
 			return "", errors.New("Invalid code")
 		}
-		decodedSymbols[i] = currSymbol
+		decodedSymbols = append(decodedSymbols, currSymbol)
 
-		if prevSymbol != "" {
+		// If there are no codes or the limit, we need to reset and add the first new character
+		if prevSymbol == "â" {
+			fmt.Println(prevSymbol)
+			fmt.Println(prevSymbol)
+			break
+		}
+		newEntry := prevSymbol + string([]rune(currSymbol)[0])
+		//newEntry := append(prevSymbol, currSymbol[0])
+		codeToSymbol[uint32(len(codeToSymbol))] = newEntry
 
-			// If there are no codes or the limit, we need to reset and add the first new character
-			currSymbolRunes := []rune(currSymbol)
-			newEntry := prevSymbol + string(currSymbolRunes[0])
-			codeToSymbol[uint32(len(codeToSymbol))] = newEntry
-
-			if len(codeToSymbol) == 4096 {
-				fmt.Println(len(codeToSymbol))
-				codeToSymbol = make(map[uint32]string)
-				initialiseMap(codeToSymbol)
-			}
-
+		if len(codeToSymbol) == 4096 {
+			codeToSymbol = make(map[uint32]string)
+			initialiseMap(codeToSymbol)
 		}
 
 		prevSymbol = currSymbol
 
 	}
+
 	return strings.Join(decodedSymbols, ""), nil
 }
 
