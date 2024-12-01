@@ -22,20 +22,21 @@ func main() {
 		fmt.Println("File splitting error:", err)
 	}
 
-	decodedString, err := decodeLZW(codes)
-	print(decodedString)
+	decodedBytes, err := decodeLZW(codes)
+	print(decodedBytes)
 	if err != nil {
 		fmt.Println("Error decoding file:", err)
 	}
 
-	err = writeToFile(fileName, decodedString)
+	err = writeToFile(fileName, decodedBytes)
 	if err != nil {
 		fmt.Println("Failed to write to file:", err)
 	}
 }
 
-func writeToFile(fileName string, decodedString string) error {
+func writeToFile(fileName string, decodedBytes []byte) error {
 
+	fmt.Printf("%d", decodedBytes)
 	base := filepath.Base(fileName)
 	nameWithoutExt := strings.TrimSuffix(base, ".z")
 	decodedFile := "decoded-" + nameWithoutExt
@@ -47,7 +48,7 @@ func writeToFile(fileName string, decodedString string) error {
 	}
 	defer file.Close()
 
-	_, err = file.WriteString(decodedString)
+	_, err = file.Write(decodedBytes)
 	if err != nil {
 		return errors.New("Could not write to new file")
 	}
@@ -61,14 +62,14 @@ func initialiseMap(codeToSymbol map[uint32]string) {
 
 }
 
-func decodeLZW(codes []uint32) (string, error) {
+func decodeLZW(codes []uint32) ([]byte, error) {
 
 	codeToSymbol := make(map[uint32]string)
 	initialiseMap(codeToSymbol)
-	decodedSymbols := make([]string, 0)
+	decodedSymbols := make([]byte, 0)
 
 	if len(codes) == 0 {
-		return "", nil
+		return nil, nil
 	}
 
 	firstCode := codes[0]
@@ -76,9 +77,9 @@ func decodeLZW(codes []uint32) (string, error) {
 	prevSymbol, ok := codeToSymbol[firstCode]
 
 	if !ok {
-		return "", errors.New("First symbol not in map")
+		return nil, errors.New("First symbol not in map")
 	}
-	decodedSymbols = append(decodedSymbols, prevSymbol)
+	decodedSymbols = append(decodedSymbols, []byte(prevSymbol)...)
 
 	for _, code := range codes[1:] {
 
@@ -91,19 +92,13 @@ func decodeLZW(codes []uint32) (string, error) {
 		} else if code == uint32(len(codeToSymbol)) {
 			// utf-8 stores codes > 127 with multiple bits. Convert to rune to make sure I get the right char
 
-			currSymbol = prevSymbol + string(([]rune(prevSymbol))[0])
+			currSymbol = prevSymbol + string(prevSymbol[0])
 		} else {
-			return "", errors.New("Invalid code")
+			return nil, errors.New("Invalid code")
 		}
-		decodedSymbols = append(decodedSymbols, currSymbol)
+		decodedSymbols = append(decodedSymbols, []byte(currSymbol)...)
 
-		// If there are no codes or the limit, we need to reset and add the first new character
-		if prevSymbol == "â" {
-			fmt.Println(prevSymbol)
-			fmt.Println(prevSymbol)
-			break
-		}
-		newEntry := prevSymbol + string([]rune(currSymbol)[0])
+		newEntry := prevSymbol + string(currSymbol[0])
 		//newEntry := append(prevSymbol, currSymbol[0])
 		codeToSymbol[uint32(len(codeToSymbol))] = newEntry
 
@@ -116,7 +111,7 @@ func decodeLZW(codes []uint32) (string, error) {
 
 	}
 
-	return strings.Join(decodedSymbols, ""), nil
+	return decodedSymbols, nil
 }
 
 func parseArgs() (string, error) {
