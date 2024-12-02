@@ -55,16 +55,17 @@ func writeToFile(fileName string, decodedBytes []byte) error {
 	return nil
 }
 
-func initialiseMap(codeToSymbol map[uint32]string) {
+// initialiseMap initializes the codeToSymbol map with codes from 0 to 255.
+func initialiseMap(codeToSymbol map[uint32][]byte) {
 	for i := 0; i < 256; i++ {
-		codeToSymbol[uint32(i)] = string(rune(i))
+		codeToSymbol[uint32(i)] = []byte{byte(i)}
 	}
-
 }
 
+// decodeLZW decodes a slice of LZW codes into the original byte sequence.
 func decodeLZW(codes []uint32) ([]byte, error) {
-
-	codeToSymbol := make(map[uint32]string)
+	// Initialize the codeToSymbol map with a range of 256.
+	codeToSymbol := make(map[uint32][]byte)
 	initialiseMap(codeToSymbol)
 	decodedSymbols := make([]byte, 0)
 
@@ -75,40 +76,41 @@ func decodeLZW(codes []uint32) ([]byte, error) {
 	firstCode := codes[0]
 
 	prevSymbol, ok := codeToSymbol[firstCode]
-
 	if !ok {
-		return nil, errors.New("First symbol not in map")
+		return nil, errors.New("first symbol not in map")
 	}
-	decodedSymbols = append(decodedSymbols, []byte(prevSymbol)...)
+
+	decodedSymbols = append(decodedSymbols, prevSymbol...)
 
 	for _, code := range codes[1:] {
+		var currSymbol []byte
 
-		var currSymbol string
-
-		// if the current code is in the map
 		if symbol, ok := codeToSymbol[code]; ok {
+			// Current code is in the map.
 			currSymbol = symbol
-			// if the current code is the next to be added to the map
 		} else if code == uint32(len(codeToSymbol)) {
-			// utf-8 stores codes > 127 with multiple bits. Convert to rune to make sure I get the right char
-
-			currSymbol = prevSymbol + string(prevSymbol[0])
+			// Current code is the next to be added to the map.
+			// This handles the special case in LZW where the code is not yet in the map.
+			currSymbol = append(append([]byte(nil), prevSymbol...), prevSymbol[0])
 		} else {
-			return nil, errors.New("Invalid code")
+			return nil, errors.New("invalid code encountered during decoding")
 		}
-		decodedSymbols = append(decodedSymbols, []byte(currSymbol)...)
 
-		newEntry := prevSymbol + string(currSymbol[0])
-		//newEntry := append(prevSymbol, currSymbol[0])
+		// Append the entire current symbol to decodedSymbols.
+		decodedSymbols = append(decodedSymbols, currSymbol...)
+
+		// Add new entry to the map: previous symbol + first byte of current symbol.
+		newEntry := append(append([]byte(nil), prevSymbol...), currSymbol[0])
 		codeToSymbol[uint32(len(codeToSymbol))] = newEntry
 
-		if len(codeToSymbol) == 4096 {
-			codeToSymbol = make(map[uint32]string)
+		// Reset the map if it reaches the maximum size (e.g., 4096 entries).
+		if len(codeToSymbol) >= 4096 {
+			codeToSymbol = make(map[uint32][]byte)
 			initialiseMap(codeToSymbol)
 		}
 
+		// Update prevSymbol for the next iteration.
 		prevSymbol = currSymbol
-
 	}
 
 	return decodedSymbols, nil
