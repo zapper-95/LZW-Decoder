@@ -13,7 +13,7 @@ func main() {
 
 	fileName, err := parseArgs()
 	if err != nil {
-		fmt.Println("arguments Error:", err)
+		fmt.Println("arguments error:", err)
 		return
 	}
 

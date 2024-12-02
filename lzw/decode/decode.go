@@ -11,14 +11,14 @@ func LZWDecode(fileName string) ([]byte, error) {
 
 	codes, err := getCodes(fileName)
 	if err != nil {
-		fmt.Println("File splitting error:", err)
+		fmt.Println("error splitting files bits:", err)
 		return nil, err
 	}
 
 	decodedBytes, err := lzwDecodeBytes(codes)
 
 	if err != nil {
-		fmt.Println("Error decoding file:", err)
+		fmt.Println("error decoding file:", err)
 		return nil, err
 	}
 
@@ -33,10 +33,11 @@ func initialiseMap(codeToSymbol map[uint32][]byte) {
 	}
 }
 
-// uses the codes to decode them into the original sequence of bytes
+// uses codes to decode a sequence of bytes
 func lzwDecodeBytes(codes []uint32) ([]byte, error) {
 
 	codeToByte := make(map[uint32][]byte)
+
 	// intialises the map with the bytes of the first 256 symbols
 	initialiseMap(codeToByte)
 
