@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
-	"strings"
 )
 
 func LZWDecode(fileName string) ([]byte, error) {
@@ -28,27 +26,6 @@ func LZWDecode(fileName string) ([]byte, error) {
 
 }
 
-func writeToFile(fileName string, decodedBytes []byte) error {
-
-	// get the name, and remove the .z extension
-	base := filepath.Base(fileName)
-	nameWithoutExt := strings.TrimSuffix(base, ".z")
-	decodedFile := "decoded-" + nameWithoutExt
-
-	file, err := os.Create(decodedFile)
-
-	if err != nil {
-		return errors.New("could not make a new file")
-	}
-	defer file.Close()
-
-	_, err = file.Write(decodedBytes)
-	if err != nil {
-		return errors.New("could not write bytes to new file")
-	}
-	return nil
-}
-
 // mapping from ints to corresponding bytes
 func initialiseMap(codeToSymbol map[uint32][]byte) {
 	for i := 0; i < 256; i++ {
@@ -56,7 +33,7 @@ func initialiseMap(codeToSymbol map[uint32][]byte) {
 	}
 }
 
-// Uses the codes to decode them into the original sequence of bytes
+// uses the codes to decode them into the original sequence of bytes
 func lzwDecodeBytes(codes []uint32) ([]byte, error) {
 
 	codeToByte := make(map[uint32][]byte)
