@@ -5,48 +5,25 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
-	"strings"
 )
 
 func LZWDecode(fileName string) ([]byte, error) {
 
 	codes, err := getCodes(fileName)
 	if err != nil {
-		fmt.Println("File splitting error:", err)
+		fmt.Println("error splitting files bits:", err)
 		return nil, err
 	}
 
 	decodedBytes, err := lzwDecodeBytes(codes)
 
 	if err != nil {
-		fmt.Println("Error decoding file:", err)
+		fmt.Println("error decoding file:", err)
 		return nil, err
 	}
 
 	return decodedBytes, nil
 
-}
-
-func writeToFile(fileName string, decodedBytes []byte) error {
-
-	// get the name, and remove the .z extension
-	base := filepath.Base(fileName)
-	nameWithoutExt := strings.TrimSuffix(base, ".z")
-	decodedFile := "decoded-" + nameWithoutExt
-
-	file, err := os.Create(decodedFile)
-
-	if err != nil {
-		return errors.New("could not make a new file")
-	}
-	defer file.Close()
-
-	_, err = file.Write(decodedBytes)
-	if err != nil {
-		return errors.New("could not write bytes to new file")
-	}
-	return nil
 }
 
 // mapping from ints to corresponding bytes
@@ -56,10 +33,11 @@ func initialiseMap(codeToSymbol map[uint32][]byte) {
 	}
 }
 
-// Uses the codes to decode them into the original sequence of bytes
+// uses codes to decode a sequence of bytes
 func lzwDecodeBytes(codes []uint32) ([]byte, error) {
 
 	codeToByte := make(map[uint32][]byte)
+
 	// intialises the map with the bytes of the first 256 symbols
 	initialiseMap(codeToByte)
 

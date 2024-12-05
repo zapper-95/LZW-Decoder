@@ -13,23 +13,23 @@ func main() {
 
 	fileName, err := parseArgs()
 	if err != nil {
-		fmt.Println("Arguments Error:", err)
+		fmt.Println("arguments error:", err)
 		return
 	}
 
 	decodedBytes, err := decode.LZWDecode(fileName)
 	if err != nil {
-		fmt.Println("Error decoding file:", err)
+		fmt.Println("error decoding file:", err)
 		return
 	}
-	fmt.Printf("Decoded file: %s\n", fileName)
+	fmt.Printf("decoded file: %s\n", fileName)
 
 	err = writeToFile(fileName, decodedBytes)
 	if err != nil {
-		fmt.Println("Failed to write to file:", err)
+		fmt.Println("failed to write to file:", err)
 		return
 	}
-	fmt.Printf("Decoded file written to: %s\n", fileName)
+	fmt.Printf("decoded file written to: %s\n", fileName)
 
 }
 
