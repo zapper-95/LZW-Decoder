@@ -7,6 +7,8 @@ import (
 	"os"
 )
 
+const initChars uint16 = 256
+
 func LZWDecode(fileName string) ([]byte, error) {
 
 	codes, err := getCodes(fileName)
@@ -27,8 +29,8 @@ func LZWDecode(fileName string) ([]byte, error) {
 }
 
 // mapping from ints to corresponding bytes
-func initialiseMap(codeToSymbol map[uint16][]byte) {
-	for i := 0; i < 256; i++ {
+func initialiseMap(codeToSymbol [][]byte) {
+	for i := 0; i < int(initChars); i++ {
 		codeToSymbol[uint16(i)] = []byte{byte(i)}
 	}
 }
@@ -36,10 +38,10 @@ func initialiseMap(codeToSymbol map[uint16][]byte) {
 // uses codes to decode a sequence of bytes
 func lzwDecodeBytes(codes []uint16) ([]byte, error) {
 
-	codeToByte := make(map[uint16][]byte)
-
-	// intialises the map with the bytes of the first 256 symbols
+	codeToByte := make([][]byte, 4096)
+	// intialises the slice with the bytes of the first 256 symbols
 	initialiseMap(codeToByte)
+	nextCode := initChars
 
 	decodedBytes := make([]byte, 0)
 
@@ -47,23 +49,20 @@ func lzwDecodeBytes(codes []uint16) ([]byte, error) {
 		return nil, nil
 	}
 
-	// handle the first code separately which is guarenteed to be in the map
+	// handle the first code separately which is guarenteed to be in the slice
 	firstCode := codes[0]
 
-	prevSymbol, ok := codeToByte[firstCode]
-	if !ok {
-		return nil, errors.New("first symbol not in map")
-	}
+	prevSymbol := codeToByte[firstCode]
 
 	decodedBytes = append(decodedBytes, prevSymbol...)
 
 	for _, code := range codes[1:] {
 		var currSymbol []byte
 
-		if symbol, ok := codeToByte[code]; ok {
-			currSymbol = symbol
-		} else if code == uint16(len(codeToByte)) {
-			// this handles the special case, where the code is not yet in the map
+		if code < nextCode {
+			currSymbol = codeToByte[code]
+		} else if code == nextCode {
+			// this handles the special case, where the code is not yet in the slice
 			// this only occurs when the encoder uses the previous code as the next symbol
 
 			currSymbol = append(append([]byte(nil), prevSymbol...), prevSymbol[0])
@@ -74,14 +73,14 @@ func lzwDecodeBytes(codes []uint16) ([]byte, error) {
 		// append the current symbol to the decoded bytes
 		decodedBytes = append(decodedBytes, currSymbol...)
 
-		// add the new entry to the map
+		// add the new entry to the slice
 		newEntry := append(append([]byte(nil), prevSymbol...), currSymbol[0])
-		codeToByte[uint16(len(codeToByte))] = newEntry
+		codeToByte[nextCode] = newEntry
 
-		// reset the map if it reaches the maximum size of 2^12
-		if len(codeToByte) >= 4096 {
-			codeToByte = make(map[uint16][]byte)
-			initialiseMap(codeToByte)
+		nextCode += 1
+		// reset the next code in the slice if it reaches the maximum size of 2^12
+		if nextCode >= 4096 {
+			nextCode = initChars
 		}
 
 		prevSymbol = currSymbol
