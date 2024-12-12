@@ -27,16 +27,16 @@ func LZWDecode(fileName string) ([]byte, error) {
 }
 
 // mapping from ints to corresponding bytes
-func initialiseMap(codeToSymbol map[uint32][]byte) {
+func initialiseMap(codeToSymbol map[uint16][]byte) {
 	for i := 0; i < 256; i++ {
-		codeToSymbol[uint32(i)] = []byte{byte(i)}
+		codeToSymbol[uint16(i)] = []byte{byte(i)}
 	}
 }
 
 // uses codes to decode a sequence of bytes
-func lzwDecodeBytes(codes []uint32) ([]byte, error) {
+func lzwDecodeBytes(codes []uint16) ([]byte, error) {
 
-	codeToByte := make(map[uint32][]byte)
+	codeToByte := make(map[uint16][]byte)
 
 	// intialises the map with the bytes of the first 256 symbols
 	initialiseMap(codeToByte)
@@ -62,7 +62,7 @@ func lzwDecodeBytes(codes []uint32) ([]byte, error) {
 
 		if symbol, ok := codeToByte[code]; ok {
 			currSymbol = symbol
-		} else if code == uint32(len(codeToByte)) {
+		} else if code == uint16(len(codeToByte)) {
 			// this handles the special case, where the code is not yet in the map
 			// this only occurs when the encoder uses the previous code as the next symbol
 
@@ -76,11 +76,11 @@ func lzwDecodeBytes(codes []uint32) ([]byte, error) {
 
 		// add the new entry to the map
 		newEntry := append(append([]byte(nil), prevSymbol...), currSymbol[0])
-		codeToByte[uint32(len(codeToByte))] = newEntry
+		codeToByte[uint16(len(codeToByte))] = newEntry
 
 		// reset the map if it reaches the maximum size of 2^12
 		if len(codeToByte) >= 4096 {
-			codeToByte = make(map[uint32][]byte)
+			codeToByte = make(map[uint16][]byte)
 			initialiseMap(codeToByte)
 		}
 
@@ -90,14 +90,14 @@ func lzwDecodeBytes(codes []uint32) ([]byte, error) {
 	return decodedBytes, nil
 }
 
-func getCodes(fileName string) ([]uint32, error) {
+func getCodes(fileName string) ([]uint16, error) {
 	file, err := os.Open(fileName)
 	if err != nil {
 		return nil, errors.New("could not open the file")
 	}
 	defer file.Close()
 
-	var codes []uint32
+	var codes []uint16
 
 	// read in the bytes in chunks of 3
 	buffer := make([]byte, 3)
@@ -113,7 +113,7 @@ func getCodes(fileName string) ([]uint32, error) {
 
 		if n >= 2 {
 			// first code is the 8 bits of the first byte, and the first 4 bits of the second byte
-			firstCode := (uint32(buffer[0]) << 4) | (uint32(buffer[1]) >> 4)
+			firstCode := (uint16(buffer[0]) << 4) | (uint16(buffer[1]) >> 4)
 			codes = append(codes, firstCode)
 		} else {
 			return nil, errors.New("too few number of bytes")
@@ -121,7 +121,7 @@ func getCodes(fileName string) ([]uint32, error) {
 
 		if n == 3 {
 			// second code is the last 4 bits of the second byte and the 8 bits of the third byte
-			secondCode := ((uint32(buffer[1]) & 0x0F) << 8) | uint32(buffer[2])
+			secondCode := ((uint16(buffer[1]) & 0x0F) << 8) | uint16(buffer[2])
 			codes = append(codes, secondCode)
 		}
 
