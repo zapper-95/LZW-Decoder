@@ -24,12 +24,13 @@ func main() {
 	}
 	fmt.Printf("decoded file: %s\n", fileName)
 
-	err = writeToFile(fileName, decodedBytes)
+	decodedFileName, err := writeToFile(fileName, decodedBytes)
 	if err != nil {
 		fmt.Println("failed to write to file:", err)
 		return
 	}
-	fmt.Printf("decoded file written to: %s\n", fileName)
+	// not written to fileName!
+	fmt.Printf("decoded file written to: %s\n", decodedFileName)
 
 }
 
@@ -45,7 +46,7 @@ func parseArgs() (string, error) {
 
 }
 
-func writeToFile(fileName string, decodedBytes []byte) error {
+func writeToFile(fileName string, decodedBytes []byte) (string, error) {
 
 	// get the name, and remove the .z extension
 	base := filepath.Base(fileName)
@@ -55,13 +56,13 @@ func writeToFile(fileName string, decodedBytes []byte) error {
 	file, err := os.Create(decodedFile)
 
 	if err != nil {
-		return errors.New("could not make a new file")
+		return "", errors.New("could not make a new file")
 	}
 	defer file.Close()
 
 	_, err = file.Write(decodedBytes)
 	if err != nil {
-		return errors.New("could not write bytes to new file")
+		return "", errors.New("could not write bytes to new file")
 	}
-	return nil
+	return decodedFile, nil
 }
