@@ -87,9 +87,7 @@ func lzwDecodeBytes(codes []uint16, codeToByte [][]byte, nextCode *uint16, prevS
 	// handle the first code separately which is guarenteed to be in the slice
 
 	for _, code := range codes {
-		fmt.Println(code, *nextCode)
 		if *prevSymbol == nil {
-			fmt.Println("nil")
 			// for the first symbol
 			firstCode := codes[0]
 
