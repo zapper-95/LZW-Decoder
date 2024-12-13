@@ -7,39 +7,76 @@ import (
 	"os"
 )
 
+const initChars uint16 = 256
+
 func LZWDecode(fileName string) ([]byte, error) {
 
-	codes, err := getCodes(fileName)
+	// Open the file
+	file, err := os.Open(fileName)
 	if err != nil {
-		fmt.Println("error splitting files bits:", err)
-		return nil, err
+		return nil, errors.New("could not open the file")
 	}
+	defer file.Close()
 
-	decodedBytes, err := lzwDecodeBytes(codes)
+	// Have array to store codes to bytes
+	codeToByte := make([][]byte, 4096)
 
-	if err != nil {
-		fmt.Println("error decoding file:", err)
-		return nil, err
+	// intialises the slice with the bytes of the first 256 symbols
+	initialiseMap(codeToByte)
+	nextCode := initChars
+
+	var prevSymbol []byte
+	var decodedBytes []byte
+
+	// Read in 3 bytes at a time, decode it, and then save the bytes
+	for {
+		// Get up to 3 bytes
+		buffer, n, err := getCurrentBytes(file)
+
+		if n == 0 && err == io.EOF {
+			// Break out of the loop when end of file reached
+			break
+		} else if err != nil {
+			return nil, err
+		}
+
+		// Get the codes from the bytes
+		codes, err := getCodes(buffer, n)
+		if err != nil {
+			fmt.Println("error splitting files bits:", err)
+			return nil, err
+		}
+
+		// Decode these two codes back into binary
+		currBytes, err := lzwDecodeBytes(codes, codeToByte, &nextCode, &prevSymbol)
+		if err != nil {
+			fmt.Println("error decoding the bytes:", err)
+		}
+
+		// Append the binary to already decoded bytes
+		decodedBytes = append(decodedBytes, currBytes...)
+
 	}
-
 	return decodedBytes, nil
 
 }
 
+func getCurrentBytes(file *os.File) ([]byte, int, error) {
+	buffer := make([]byte, 3)
+
+	n, err := file.Read(buffer)
+	return buffer, n, err
+}
+
 // mapping from ints to corresponding bytes
-func initialiseMap(codeToSymbol map[uint32][]byte) {
-	for i := 0; i < 256; i++ {
-		codeToSymbol[uint32(i)] = []byte{byte(i)}
+func initialiseMap(codeToSymbol [][]byte) {
+	for i := 0; i < int(initChars); i++ {
+		codeToSymbol[uint16(i)] = []byte{byte(i)}
 	}
 }
 
 // uses codes to decode a sequence of bytes
-func lzwDecodeBytes(codes []uint32) ([]byte, error) {
-
-	codeToByte := make(map[uint32][]byte)
-
-	// intialises the map with the bytes of the first 256 symbols
-	initialiseMap(codeToByte)
+func lzwDecodeBytes(codes []uint16, codeToByte [][]byte, nextCode *uint16, prevSymbol *[]byte) ([]byte, error) {
 
 	decodedBytes := make([]byte, 0)
 
@@ -47,26 +84,28 @@ func lzwDecodeBytes(codes []uint32) ([]byte, error) {
 		return nil, nil
 	}
 
-	// handle the first code separately which is guarenteed to be in the map
-	firstCode := codes[0]
+	// handle the first code separately which is guarenteed to be in the slice
 
-	prevSymbol, ok := codeToByte[firstCode]
-	if !ok {
-		return nil, errors.New("first symbol not in map")
-	}
+	for _, code := range codes {
+		if *prevSymbol == nil {
+			// for the first symbol
+			firstCode := codes[0]
 
-	decodedBytes = append(decodedBytes, prevSymbol...)
+			*prevSymbol = codeToByte[firstCode]
 
-	for _, code := range codes[1:] {
+			decodedBytes = append(decodedBytes, *prevSymbol...)
+			continue
+		}
+
 		var currSymbol []byte
 
-		if symbol, ok := codeToByte[code]; ok {
-			currSymbol = symbol
-		} else if code == uint32(len(codeToByte)) {
-			// this handles the special case, where the code is not yet in the map
+		if code < *nextCode {
+			currSymbol = codeToByte[code]
+		} else if code == *nextCode {
+			// this handles the special case, where the code is not yet in the slice
 			// this only occurs when the encoder uses the previous code as the next symbol
 
-			currSymbol = append(append([]byte(nil), prevSymbol...), prevSymbol[0])
+			currSymbol = append(append([]byte(nil), *prevSymbol...), (*prevSymbol)[0])
 		} else {
 			return nil, errors.New("invalid code encountered during decoding")
 		}
@@ -74,57 +113,38 @@ func lzwDecodeBytes(codes []uint32) ([]byte, error) {
 		// append the current symbol to the decoded bytes
 		decodedBytes = append(decodedBytes, currSymbol...)
 
-		// add the new entry to the map
-		newEntry := append(append([]byte(nil), prevSymbol...), currSymbol[0])
-		codeToByte[uint32(len(codeToByte))] = newEntry
+		// add the new entry to the slice
+		newEntry := append(append([]byte(nil), *prevSymbol...), currSymbol[0])
+		codeToByte[*nextCode] = newEntry
 
-		// reset the map if it reaches the maximum size of 2^12
-		if len(codeToByte) >= 4096 {
-			codeToByte = make(map[uint32][]byte)
-			initialiseMap(codeToByte)
+		*nextCode += 1
+		// reset the next code in the slice if it reaches the maximum size of 2^12
+		if *nextCode >= 4096 {
+			*nextCode = initChars
 		}
 
-		prevSymbol = currSymbol
+		*prevSymbol = currSymbol
 	}
 
 	return decodedBytes, nil
 }
 
-func getCodes(fileName string) ([]uint32, error) {
-	file, err := os.Open(fileName)
-	if err != nil {
-		return nil, errors.New("could not open the file")
+func getCodes(buffer []byte, n int) ([]uint16, error) {
+
+	var codes []uint16
+
+	if n >= 2 {
+		// first code is the 8 bits of the first byte, and the first 4 bits of the second byte
+		firstCode := (uint16(buffer[0]) << 4) | (uint16(buffer[1]) >> 4)
+		codes = append(codes, firstCode)
+	} else {
+		return nil, errors.New("too few number of bytes")
 	}
-	defer file.Close()
 
-	var codes []uint32
-
-	// read in the bytes in chunks of 3
-	buffer := make([]byte, 3)
-
-	for {
-		n, err := file.Read(buffer)
-
-		if n == 0 && err == io.EOF {
-			break
-		} else if err != nil {
-			return nil, err
-		}
-
-		if n >= 2 {
-			// first code is the 8 bits of the first byte, and the first 4 bits of the second byte
-			firstCode := (uint32(buffer[0]) << 4) | (uint32(buffer[1]) >> 4)
-			codes = append(codes, firstCode)
-		} else {
-			return nil, errors.New("too few number of bytes")
-		}
-
-		if n == 3 {
-			// second code is the last 4 bits of the second byte and the 8 bits of the third byte
-			secondCode := ((uint32(buffer[1]) & 0x0F) << 8) | uint32(buffer[2])
-			codes = append(codes, secondCode)
-		}
-
+	if n == 3 {
+		// second code is the last 4 bits of the second byte and the 8 bits of the third byte
+		secondCode := ((uint16(buffer[1]) & 0x0F) << 8) | uint16(buffer[2])
+		codes = append(codes, secondCode)
 	}
 	return codes, nil
 }
